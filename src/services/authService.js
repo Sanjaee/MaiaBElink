@@ -46,6 +46,21 @@ module.exports = {
     }
   },
 
+  getUserEmailByVerificationToken: async (token) => {
+    try {
+      const user = await UserModel.findUserByVerificationToken(token);
+      if (!user) {
+        throw new Error("User not found for the provided verification token");
+      }
+      return user.email;
+    } catch (error) {
+      throw new Error(
+        "Error while fetching user email by verification token: " +
+          error.message
+      );
+    }
+  },
+
   getUserByEmail: async (email) => {
     return await UserModel.findUserByEmail(email);
   },

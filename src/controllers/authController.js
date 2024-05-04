@@ -36,12 +36,32 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/verify/:token", async (req, res) => {
+router.post("/verify/:token", async (req, res) => {
   const { token } = req.params;
   try {
     const isVerified = await AuthService.verifyTokenByLink(token);
     if (isVerified) {
-      res.json({ message: "Email verified successfully" });
+      // Ambil email pengguna dari token yang diverifikasi
+      const userEmail = await AuthService.getUserEmailByVerificationToken(
+        token
+      );
+
+      // Dapatkan informasi pengguna berdasarkan email
+      const user = await AuthService.getUserByEmail(userEmail);
+
+      // Buat token JWT
+      const accessToken = jwt.sign(
+        {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          isVerified: user.isVerified,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      res.json({ message: "Email verified successfully", token: accessToken });
     } else {
       res.status(400).json({ error: "Invalid token" });
     }
