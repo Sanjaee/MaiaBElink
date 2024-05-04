@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
 
 module.exports = {
   sendVerificationEmail: async (email, username, verificationToken) => {
-    const verifyLink = `${process.env.APP_URL}/verify/${verificationToken}`;
+    const verifyLink = `${process.env.APP_URL}.vercel.app/verify/${verificationToken}`;
     const mailOptions = {
       from: "mailtrap@demomailtrap.com",
       to: email,
