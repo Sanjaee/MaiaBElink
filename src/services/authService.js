@@ -1,4 +1,3 @@
-// services/authService.js
 const bcrypt = require("bcryptjs");
 const UserModel = require("../models/user");
 const EmailUtils = require("../utils/emailUtils");
