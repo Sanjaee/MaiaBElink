@@ -1,20 +1,33 @@
-const bcrypt = require("bcryptjs");
-const UserModel = require("../models/user");
-const EmailUtils = require("../utils/emailUtils");
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { sendVerificationEmail } from "../utils/emailUtils.js"; // Adjust import statement
 
-module.exports = {
+const prisma = new PrismaClient();
+
+const AuthService = {
   registerUser: async (username, email, password) => {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await UserModel.createUser(username, email, hashedPassword);
+    const user = await prisma.user.create({
+      data: {
+        username,
+        email,
+        password: hashedPassword,
+      },
+    });
 
     const verificationToken = Math.floor(100000 + Math.random() * 900000); // Generate random 6-digit token
-    await UserModel.updateUserVerificationToken(user.id, verificationToken);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { verificationToken: String(verificationToken) },
+    });
 
-    await EmailUtils.sendVerificationEmail(email, username, verificationToken);
+    await sendVerificationEmail(email, username, verificationToken);
   },
 
   loginUser: async (email, password) => {
-    const user = await UserModel.findUserByEmail(email);
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
     if (!user) {
       throw new Error("User not found");
     }
@@ -33,12 +46,17 @@ module.exports = {
 
   verifyTokenByLink: async (token) => {
     try {
-      const user = await UserModel.findUserByVerificationToken(token);
+      const user = await prisma.user.findFirst({
+        where: { verificationToken: String(token) },
+      });
       if (!user) {
         throw new Error("Invalid token");
       }
 
-      await UserModel.updateUserVerificationStatus(user.id);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true },
+      });
       return true;
     } catch (error) {
       throw new Error("Verification failed: " + error.message);
@@ -47,7 +65,9 @@ module.exports = {
 
   getUserEmailByVerificationToken: async (token) => {
     try {
-      const user = await UserModel.findUserByVerificationToken(token);
+      const user = await prisma.user.findFirst({
+        where: { verificationToken: String(token) },
+      });
       if (!user) {
         throw new Error("User not found for the provided verification token");
       }
@@ -61,6 +81,40 @@ module.exports = {
   },
 
   getUserByEmail: async (email) => {
-    return await UserModel.findUserByEmail(email);
+    return await prisma.user.findUnique({
+      where: { email },
+    });
+  },
+
+  updateUserVerificationTokenByEmail: async (email, verificationToken) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email },
+      });
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { verificationToken: String(verificationToken) },
+      });
+    } catch (error) {
+      throw new Error(
+        "Failed to update user verification token by email: " + error.message
+      );
+    }
+  },
+
+  sendNewVerificationToken: async (email, username, newVerificationToken) => {
+    try {
+      await sendVerificationEmail(email, username, newVerificationToken);
+    } catch (error) {
+      throw new Error(
+        "Failed to send new verification token: " + error.message
+      );
+    }
   },
 };
+
+export default AuthService;

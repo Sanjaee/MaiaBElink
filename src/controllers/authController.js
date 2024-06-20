@@ -1,8 +1,9 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
-const jwt = require("jsonwebtoken");
-const AuthService = require("../services/authService");
-require("dotenv").config();
+import jwt from "jsonwebtoken";
+import AuthService from "../services/authService.js"; // Add the .js extension
+import dotenv from "dotenv";
+dotenv.config();
 
 router.post("/register", async (req, res) => {
   const { username, email, password } = req.body;
@@ -41,15 +42,10 @@ router.post("/verify/:token", async (req, res) => {
   try {
     const isVerified = await AuthService.verifyTokenByLink(token);
     if (isVerified) {
-      // Ambil email pengguna dari token yang diverifikasi
       const userEmail = await AuthService.getUserEmailByVerificationToken(
         token
       );
-
-      // Dapatkan informasi pengguna berdasarkan email
       const user = await AuthService.getUserByEmail(userEmail);
-
-      // Buat token JWT
       const accessToken = jwt.sign(
         {
           id: user.id,
@@ -60,7 +56,6 @@ router.post("/verify/:token", async (req, res) => {
         process.env.JWT_SECRET,
         { expiresIn: "1h" }
       );
-
       res.json({ message: "Email verified successfully", token: accessToken });
     } else {
       res.status(400).json({ error: "Invalid token" });
@@ -70,4 +65,30 @@ router.post("/verify/:token", async (req, res) => {
   }
 });
 
-module.exports = router;
+router.post("/send-verification-email", async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await AuthService.getUserByEmail(email);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const newVerificationToken = Math.floor(100000 + Math.random() * 900000);
+    await AuthService.updateUserVerificationTokenByEmail(
+      email,
+      newVerificationToken
+    );
+
+    await AuthService.sendNewVerificationToken(
+      email,
+      user.username,
+      newVerificationToken
+    );
+
+    res.status(200).json({ message: "Verification email sent successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
